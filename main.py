@@ -46,14 +46,12 @@ class ViewStaff(discord.ui.View):
 
         if candidato and cargo:
             await candidato.add_roles(cargo)
-            # Resposta para quem apertou o botão
             await interaction.response.send_message(f"✅ {candidato.mention} foi aceito e recebeu o cargo!", ephemeral=True)
             
-            # Tentar avisar o candidato no privado que ele passou
             try:
                 await candidato.send(f"🎉 Parabéns! Você passou na primeira parte do recrutamento em **{guild.name}**. Abra um ticket no servidor para darmos continuidade!")
             except:
-                pass # Se a DM estiver fechada, ele já ganhou o cargo de qualquer jeito
+                pass 
 
             await interaction.message.edit(view=None)
         else:
@@ -119,8 +117,10 @@ async def postar(ctx):
         description="📌 **Requisitos:**\n• +16 anos\n• Responsabilidade\n• Regras da cidade\n\nClique no botão abaixo para iniciar seu formulário.",
         color=0xFF007F
     )
-    # Se quiser adicionar a imagem de novo, basta descomentar a linha abaixo:
-    # embed.set_image(url="LINK_DA_IMAGEM")
+    
+    # Imagem configurada corretamente aqui:
+    embed.set_image(url="https://media.discordapp.net/attachments/1456593912016801916/1478539505861660734/image.png")
+
     await ctx.send(embed=embed, view=BotaoRecrutamento())
 
 bot.run(TOKEN)
