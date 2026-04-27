@@ -137,8 +137,13 @@ bot = MeuBot()
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def postar(ctx):
-    embed = discord.Embed(title="RAZE ROLEPLAY | RECRUTAMENTO", description="📌 O formulário possui **3 etapas** (15 perguntas).\nResponda com calma.", color=0xFF007F)
-    embed.set_image(url="https://discordapp.net")
-    await ctx.send(embed=embed, view=BotaoRecrutamento())
+    embed = discord.Embed(
+        title="RAZE ROLEPLAY | RECRUTAMENTO",
+        description="📌 **Requisitos:**\n• +16 anos\n• Responsabilidade\n• Regras da cidade\n\nClique no botão abaixo para iniciar seu formulário.",
+        color=0xFF007F
+    )
+    
+    # Imagem configurada corretamente aqui:
+    embed.set_image(url="https://media.discordapp.net/attachments/1456593912016801916/1478539505861660734/image.png")
 
 bot.run(TOKEN)
