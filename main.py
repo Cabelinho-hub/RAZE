@@ -20,7 +20,7 @@ def keep_alive():
 # --- CONFIGURAÇÕES DO BOT ---
 # O Token será puxado das "Environment Variables" da Render que configuramos antes
 TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG = 1498147503453769738  # <--- TROQUE PELO ID DO CANAL ONDE A STAFF RECEBE AS RESPOSTAS
+ID_CANAL_LOG = 1498152156694450226  # <--- TROQUE PELO ID DO CANAL ONDE A STAFF RECEBE AS RESPOSTAS
 
 class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutamento Staff'):
     p1 = discord.ui.TextInput(label="Qual seu nome e idade?", placeholder="Ex: João, 18 anos", min_length=3)
