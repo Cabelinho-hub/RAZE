@@ -8,8 +8,6 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 ID_CANAL_LOG = 1456450750241570887 
 ID_CARGO_STAFF = 1411158389911715910 
 
-# ... resto do código ...
-
 # 1. MODAL PARA O MOTIVO DA RECUSA
 class ModalMotivoRecusa(discord.ui.Modal, title='Motivo da Rejeição'):
     motivo = discord.ui.TextInput(
