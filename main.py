@@ -5,8 +5,8 @@ from discord import app_commands
 
 # --- CONFIGURAÇÕES ---
 TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG = 1498152156694450226 
-ID_CARGO_STAFF = 1273754045772726333 
+ID_CANAL_LOG = 1456450750241570887 
+ID_CARGO_STAFF = 1411158389911715910 
 
 # ... resto do código ...
 
@@ -49,7 +49,7 @@ class ViewStaff(discord.ui.View):
 
         if candidato and cargo:
             await candidato.add_roles(cargo)
-            await interaction.response.send_message(f"✅ {candidato.mention} agora é da Staff!", ephemeral=True)
+            await interaction.response.send_message(f"✅ {candidato.mention} você passou a primeira parte, abra um ticket em nosso servidor pra darmos continuidade!", ephemeral=True)
             await interaction.message.edit(view=None) # Remove os botões
         else:
             await interaction.response.send_message("Erro: Membro ou Cargo não encontrado.", ephemeral=True)
