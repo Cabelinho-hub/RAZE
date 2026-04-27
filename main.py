@@ -1,9 +1,7 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+import os  # Lá na primeira linha do arquivo
 
-# --- CONFIGURAÇÕES ---
-TOKEN = "SEU_TOKEN_AQUI"
+# Em vez de colocar o token direto aqui, o bot vai "pescar" ele do sistema
+TOKEN = os.getenv("DISCORD_TOKEN") 
 ID_CANAL_LOG = 1498152156694450226  # Canal onde os formulários chegam
 ID_CARGO_STAFF = 1273754045772726333 # ID do cargo que a pessoa vai ganhar ao ser aceita
 
