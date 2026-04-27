@@ -5,7 +5,7 @@ from discord import app_commands
 # --- CONFIGURAÇÕES ---
 TOKEN = "SEU_TOKEN_AQUI"
 ID_CANAL_LOG = 123456789  # Canal onde os formulários chegam
-ID_CARGO_STAFF = 987654321 # ID do cargo que a pessoa vai ganhar ao ser aceita
+ID_CARGO_STAFF = 1273754045772726333 # ID do cargo que a pessoa vai ganhar ao ser aceita
 
 # 1. MODAL PARA O MOTIVO DA RECUSA
 class ModalMotivoRecusa(discord.ui.Modal, title='Motivo da Rejeição'):
