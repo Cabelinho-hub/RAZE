@@ -1,122 +1,92 @@
 import discord
-import os
 from discord.ext import commands
+import os
+from flask import Flask
+from threading import Thread
+
+# --- MANTER ONLINE ---
+app = Flask('')
+@app.route('/')
+def home(): return "Bot Online!"
+def run(): app.run(host='0.0.0.0', port=8080)
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 # --- CONFIGURAÇÕES ---
 TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG = 1456450750241570887 
-ID_CARGO_STAFF = 1411158389911715910 
+ID_CANAL_LOG = 1456450750241570887 # <--- SEU ID DE CANAL AQUI
+ID_CARGO_STAFF = 1411158389911715910 # <--- COLOQUE O ID DO CARGO QUE O PLAYER VAI GANHAR AO SER ACEITO
 
-# --- ETAPA 3 (Final) ---
-class FormularioEtapa3(discord.ui.Modal, title='Recrutamento Raze - Parte 3/3'):
-    q11 = discord.ui.TextInput(label="Amigo denunciado: como agiria?", style=discord.TextStyle.paragraph)
-    q12 = discord.ui.TextInput(label="Lidar com jogador desrespeitoso?", style=discord.TextStyle.paragraph)
-    q13 = discord.ui.TextInput(label="O que entende por abuso de poder?", style=discord.TextStyle.paragraph)
-    q14 = discord.ui.TextInput(label="Diferencial: Por que você?", style=discord.TextStyle.paragraph)
-    q15 = discord.ui.TextInput(label="Ciente que erro gera expulsão?", style=discord.TextStyle.short, placeholder="Sim ou Não")
+# --- MODAL DE MOTIVO DA RECUSA ---
+class ModalRecusa(discord.ui.Modal, title='Motivo da Reprovação'):
+    motivo = discord.ui.TextInput(label="Por que ele foi recusado?", style=discord.TextStyle.paragraph, placeholder="Ex: Idade insuficiente ou falta de conhecimento das regras.")
 
-    def __init__(self, dados):
+    def __init__(self, membro_candidato):
         super().__init__()
-        self.dados = dados
+        self.membro_candidato = membro_candidato
 
-    async def on_submit(self, interaction: discord.Interaction):
-        canal_log = interaction.guild.get_channel(ID_CANAL_LOG)
-        if not canal_log:
-            return await interaction.response.send_message("Erro: Canal de log não encontrado.", ephemeral=True)
-
-        embed = discord.Embed(title=f"📝 Formulário Staff: {self.dados['p1']}", color=discord.Color.magenta())
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        
-        embed.add_field(name="👤 Candidato", value=f"{interaction.user.mention}", inline=False)
-        embed.add_field(name="📋 Identificação e Exp (1-5)", value=f"**Nome:** {self.dados['p1']}\n**Horas:** {self.dados['p2']}\n**Org:** {self.dados['p3']}\n**Regras:** {self.dados['p4']}\n**Onde foi:** {self.dados['p5']}", inline=False)
-        embed.add_field(name="⚙️ Postura e RP (6-10)", value=f"**Dedicado:** {self.dados['p6']}\n**Hierarquia:** {self.dados['p7']}\n**Exigências:** {self.dados['p8']}\n**Ação RP:** {self.dados['p9']}\n**Fora Ticket:** {self.dados['p10']}", inline=False)
-        embed.add_field(name="⚖️ Ética e Final (11-15)", value=f"**Amigo:** {self.q11.value}\n**Pressão:** {self.q12.value}\n**Abuso:** {self.q13.value}\n**Diferencial:** {self.q14.value}\n**Compromisso:** {self.q15.value}", inline=False)
-
-        await canal_log.send(embed=embed, view=ViewStaff(interaction.user.id))
-        await interaction.response.send_message("✅ Seu formulário foi enviado com sucesso!", ephemeral=True)
-
-# --- ETAPA 2 ---
-class FormularioEtapa2(discord.ui.Modal, title='Recrutamento Raze - Parte 2/3'):
-    q6 = discord.ui.TextInput(label="Horas por dia que pretende dedicar?", style=discord.TextStyle.short)
-    q7 = discord.ui.TextInput(label="Superior errado: como você agiria?", style=discord.TextStyle.paragraph)
-    q8 = discord.ui.TextInput(label="Se adequaria às exigências da staff?", style=discord.TextStyle.short)
-    q9 = discord.ui.TextInput(label="Denúncia em ação de RP: O que faz?", style=discord.TextStyle.paragraph)
-    q10 = discord.ui.TextInput(label="Player insiste fora do ticket: Conduta?", style=discord.TextStyle.paragraph)
-
-    def __init__(self, dados):
-        super().__init__()
-        self.dados = dados
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.dados.update({'p6': self.q6.value, 'p7': self.q7.value, 'p8': self.q8.value, 'p9': self.q9.value, 'p10': self.q10.value})
-        await interaction.response.send_modal(FormularioEtapa3(self.dados))
-
-# --- ETAPA 1 ---
-class FormularioEtapa1(discord.ui.Modal, title='Recrutamento Raze - Parte 1/3'):
-    q1 = discord.ui.TextInput(label="Nome RP e Idade", style=discord.TextStyle.short)
-    q2 = discord.ui.TextInput(label="Horários reais que garante presença?", style=discord.TextStyle.short)
-    q3 = discord.ui.TextInput(label="Função e Org atual (Líder/Membro)?", style=discord.TextStyle.short)
-    q4 = discord.ui.TextInput(label="Cite 2 regras e dê exemplo prático", style=discord.TextStyle.paragraph)
-    q5 = discord.ui.TextInput(label="Onde já foi Staff e tempo?", style=discord.TextStyle.paragraph)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        dados = {'p1': self.q1.value, 'p2': self.q2.value, 'p3': self.q3.value, 'p4': self.q4.value, 'p5': self.q5.value}
-        await interaction.response.send_modal(FormularioEtapa2(dados))
-
-# --- LOGS E DECISÃO ---
-class ModalMotivoRecusa(discord.ui.Modal, title='Motivo da Rejeição'):
-    motivo = discord.ui.TextInput(label="Motivo:", style=discord.TextStyle.paragraph, required=True)
-    def __init__(self, candidato): super().__init__(); self.candidato = candidato
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            embed_dm = discord.Embed(title="Raze Roleplay", description=f"Você foi recusado.\n**Motivo:** {self.motivo.value}", color=discord.Color.red())
-            await self.candidato.send(embed=embed_dm)
-            
-            # Atualiza o Log com quem recusou
-            embed = interaction.message.embeds[0]
-            embed.color = discord.Color.red()
-            embed.add_field(name="🔴 Status", value=f"Recusado por {interaction.user.mention}\n**Motivo:** {self.motivo.value}", inline=False)
-            await interaction.message.edit(embed=embed, view=None)
-            await interaction.response.send_message("Recusado com sucesso.", ephemeral=True)
+            await self.membro_candidato.send(f"❌ **Recrutamento Raze Roleplay**\nInfelizmente você foi reprovado.\n**Motivo:** {self.motivo.value}")
+            await interaction.response.send_message(f"Candidato {self.membro_candidato.mention} recusado e avisado no PV.", ephemeral=True)
+            # Desativa os botões da mensagem original
+            await interaction.message.edit(view=None)
         except:
-            await interaction.response.send_message("⚠️ Usuário recusado, mas DM fechada.", ephemeral=True)
+            await interaction.response.send_message("O candidato está com o PV fechado, mas a recusa foi registrada.", ephemeral=True)
 
+# --- VIEW COM BOTÕES DE ACEITAR/RECUSAR ---
 class ViewStaff(discord.ui.View):
-    def __init__(self, candidato_id):
+    def __init__(self, membro_id):
         super().__init__(timeout=None)
-        self.candidato_id = candidato_id
+        self.membro_id = membro_id
 
-    @discord.ui.button(label="Aceitar", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Aceitar", style=discord.ButtonStyle.success, custom_id="aceitar_btn")
     async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        candidato = guild.get_member(self.candidato_id)
-        cargo = guild.get_role(ID_CARGO_STAFF)
+        membro = interaction.guild.get_member(self.membro_id)
+        cargo = interaction.guild.get_role(ID_CARGO_STAFF)
         
-        if candidato and cargo:
-            await candidato.add_roles(cargo)
-            # Atualiza o Log com quem aceitou
-            embed = interaction.message.embeds[0]
-            embed.color = discord.Color.green()
-            embed.add_field(name="🟢 Status", value=f"Aceito por {interaction.user.mention}", inline=False)
-            await interaction.message.edit(embed=embed, view=None)
-            await interaction.response.send_message(f"✅ {candidato.mention} aceito!", ephemeral=True)
+        if membro and cargo:
+            await membro.add_roles(cargo)
+            try:
+                await membro.send(f"🥳 **Parabéns!** Você foi aceito na Staff do **Raze Roleplay**!\nO cargo **{cargo.name}** já foi adicionado a você.")
+            except: pass
+            await interaction.response.send_message(f"✅ {membro.mention} foi aceito e recebeu o cargo!", ephemeral=True)
+            await interaction.message.edit(view=None)
         else:
             await interaction.response.send_message("Erro: Membro ou Cargo não encontrado.", ephemeral=True)
 
-    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.danger, custom_id="recusar_btn")
     async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        candidato = interaction.guild.get_member(self.candidato_id)
-        if candidato:
-            await interaction.response.send_modal(ModalMotivoRecusa(candidato))
+        membro = interaction.guild.get_member(self.membro_id)
+        if membro:
+            await interaction.response.send_modal(ModalRecusa(membro))
+        else:
+            await interaction.response.send_message("Membro não encontrado no servidor.", ephemeral=True)
 
-# --- BOT ---
-class BotaoRecrutamento(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+# --- FORMULÁRIO DE PERGUNTAS (Simplificado para evitar o erro do log) ---
+class FormularioRecrutamento(discord.ui.Modal, title='Recrutamento Staff'):
+    p1 = discord.ui.TextInput(label="Nome e Idade", min_length=3)
+    p2 = discord.ui.TextInput(label="Por que quer ser Staff?", style=discord.TextStyle.paragraph)
+    p3 = discord.ui.TextInput(label="Experiência anterior?", placeholder="Sim/Não, onde?")
+    p4 = discord.ui.TextInput(label="Disponibilidade diária", placeholder="Ex: 4 a 6 horas")
+    p5 = discord.ui.TextInput(label="O que faria em caso de RDM?", style=discord.TextStyle.paragraph)
 
-    @discord.ui.button(label="📝 Iniciar Recrutamento", style=discord.ButtonStyle.secondary, custom_id="btn_recrut")
-    async def entrar_recrutamento(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(FormularioEtapa1())
+    async def on_submit(self, interaction: discord.Interaction):
+        canal_log = interaction.guild.get_channel(ID_CANAL_LOG)
+        embed = discord.Embed(title="📝 Nova Ficha de Recrutamento", color=0xFF007F)
+        embed.add_field(name="Candidato:", value=interaction.user.mention)
+        embed.add_field(name="Respostas:", value=f"1: {self.p1.value}\n2: {self.p2.value}\n3: {self.p3.value}\n4: {self.p4.value}\n5: {self.p5.value}")
+        
+        await canal_log.send(embed=embed, view=ViewStaff(interaction.user.id))
+        await interaction.response.send_message("✅ Seu formulário foi enviado com sucesso!", ephemeral=True)
+
+# --- RESTANTE DO CÓDIGO (BOT) ---
+class BotaoInicio(discord.ui.View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="📝 Iniciar Recrutamento", style=discord.ButtonStyle.danger, custom_id="init_btn")
+    async def iniciar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(FormularioRecrutamento())
 
 class MeuBot(commands.Bot):
     def __init__(self):
@@ -124,21 +94,15 @@ class MeuBot(commands.Bot):
         intents.members = True
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
-
-    async def setup_hook(self):
-        self.add_view(BotaoRecrutamento())
+    async def setup_hook(self): self.add_view(BotaoInicio())
 
 bot = MeuBot()
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def postar(ctx):
-    embed = discord.Embed(
-        title="RAZE ROLEPLAY | RECRUTAMENTO",
-        description="📌 O formulário possui **3 etapas** (15 perguntas).\nResponda com calma.",
-        color=0xFF007F
-    )
-    embed.set_image(url="https://media.discordapp.net/attachments/1456593912016801916/1478539505861660734/image.png?ex=69eff5b8&is=69eea438&hm=ceed338fd89c0813a3ca460417c00fbeda374d28e5ffb0b1e56e88882496bfd0&=&format=webp&quality=lossless&width=1356&height=1356")
-    await ctx.send(embed=embed, view=BotaoRecrutamento())
+    embed = discord.Embed(title="RAZE ROLEPLAY | RECRUTAMENTO", description="Clique no botão abaixo para iniciar.", color=0xFF007F)
+    await ctx.send(embed=embed, view=BotaoInicio())
 
+keep_alive()
 bot.run(TOKEN)
