@@ -1,38 +1,76 @@
 import discord
 from discord.ext import commands
-import os
-from flask import Flask
-from threading import Thread
+from discord import app_commands
 
-# --- SISTEMA PARA MANTER O BOT ONLINE NA RENDER ---
-app = Flask('')
-@app.route('/')
-def home():
-    return "Bot Online!"
+# --- CONFIGURAÇÕES ---
+TOKEN = "SEU_TOKEN_AQUI"
+ID_CANAL_LOG = 123456789  # Canal onde os formulários chegam
+ID_CARGO_STAFF = 987654321 # ID do cargo que a pessoa vai ganhar ao ser aceita
 
-def run():
-    app.run(host='0.0.0.0', port=8080)
+# 1. MODAL PARA O MOTIVO DA RECUSA
+class ModalMotivoRecusa(discord.ui.Modal, title='Motivo da Rejeição'):
+    motivo = discord.ui.TextInput(
+        label="Descreva o motivo da recusa:",
+        style=discord.TextStyle.paragraph,
+        placeholder="Ex: Você não atingiu a idade mínima.",
+        required=True
+    )
 
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
+    def __init__(self, candidato):
+        super().__init__()
+        self.candidato = candidato
 
-# --- CONFIGURAÇÕES DO BOT ---
-# O Token será puxado das "Environment Variables" da Render que configuramos antes
-TOKEN = os.getenv("DISCORD_TOKEN")
-ID_CANAL_LOG = 1498152156694450226  # <--- TROQUE PELO ID DO CANAL ONDE A STAFF RECEBE AS RESPOSTAS
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            embed = discord.Embed(title="Atualização de Recrutamento", color=discord.Color.red())
+            embed.description = f"Olá, seu formulário em **{interaction.guild.name}** foi recusado.\n\n**Motivo:** {self.motivo.value}"
+            await self.candidato.send(embed=embed)
+            
+            await interaction.response.send_message(f"❌ {self.candidato.display_name} foi recusado e avisado.", ephemeral=True)
+            # Desativa os botões da mensagem original
+            await interaction.message.edit(view=None)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"⚠️ Recusado, mas não consegui enviar DM para {self.candidato.mention}.", ephemeral=True)
 
+# 2. VIEW COM OS BOTÕES DE ACEITAR/RECUSAR (PARA A STAFF)
+class ViewStaff(discord.ui.View):
+    def __init__(self, candidato_id):
+        super().__init__(timeout=None)
+        self.candidato_id = candidato_id
+
+    @discord.ui.button(label="Aceitar", style=discord.ButtonStyle.success)
+    async def aceitar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        candidato = guild.get_member(self.candidato_id)
+        cargo = guild.get_role(ID_CARGO_STAFF)
+
+        if candidato and cargo:
+            await candidato.add_roles(cargo)
+            await interaction.response.send_message(f"✅ {candidato.mention} agora é da Staff!", ephemeral=True)
+            await interaction.message.edit(view=None) # Remove os botões
+        else:
+            await interaction.response.send_message("Erro: Membro ou Cargo não encontrado.", ephemeral=True)
+
+    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.danger)
+    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        candidato = interaction.guild.get_member(self.candidato_id)
+        if candidato:
+            await interaction.response.send_modal(ModalMotivoRecusa(candidato))
+        else:
+            await interaction.response.send_message("Candidato não está mais no servidor.", ephemeral=True)
+
+# 3. MODAL DO FORMULÁRIO (O QUE O CANDIDATO PREENCHE)
 class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutamento Staff'):
-    p1 = discord.ui.TextInput(label="Qual seu nome e idade?", placeholder="Ex: João, 18 anos", min_length=3)
+    p1 = discord.ui.TextInput(label="Qual seu nome e idade?", placeholder="Ex: João, 18 anos")
     p2 = discord.ui.TextInput(label="Por que quer ser Staff?", style=discord.TextStyle.paragraph)
     p3 = discord.ui.TextInput(label="Tem experiência anterior?", placeholder="Sim/Não, onde?")
-    p4 = discord.ui.TextInput(label="Quanto tempo tem disponível por dia?", placeholder="Ex: 4 horas")
+    p4 = discord.ui.TextInput(label="Quanto tempo tem disponível?", placeholder="Ex: 4 horas")
     p5 = discord.ui.TextInput(label="Conhece as regras da cidade?", placeholder="Sim/Não")
 
     async def on_submit(self, interaction: discord.Interaction):
         canal_log = interaction.guild.get_channel(ID_CANAL_LOG)
         
-        embed = discord.Embed(title="📝 Novo Formulário Recebido", color=0xFF007F)
+        embed = discord.Embed(title="📝 Novo Formulário Recebido", color=discord.Color.magenta())
         embed.add_field(name="Candidato:", value=interaction.user.mention, inline=False)
         embed.add_field(name="1. Nome/Idade", value=self.p1.value, inline=False)
         embed.add_field(name="2. Motivo", value=self.p2.value, inline=False)
@@ -40,19 +78,11 @@ class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutament
         embed.add_field(name="4. Disponibilidade", value=self.p4.value, inline=False)
         embed.add_field(name="5. Regras", value=self.p5.value, inline=False)
 
-        # Botões de Aceitar/Recusar para a Staff
-        view = discord.ui.View()
-        btn_aceitar = discord.ui.Button(label="Aceitar", style=discord.ButtonStyle.success)
-        btn_recusar = discord.ui.Button(label="Recusar", style=discord.ButtonStyle.danger)
-        view.add_item(btn_aceitar)
-        view.add_item(btn_recusar)
+        # Enviando para a staff com a ViewStaff que criamos acima
+        await canal_log.send(embed=embed, view=ViewStaff(interaction.user.id))
+        await interaction.response.send_message("✅ Seu formulário foi enviado com sucesso!", ephemeral=True)
 
-        if canal_log:
-            await canal_log.send(embed=embed, view=view)
-            await interaction.response.send_message("✅ Seu formulário foi enviado com sucesso!", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Erro: Canal de logs não encontrado. Avise a administração.", ephemeral=True)
-
+# --- RESTANTE DO SEU CÓDIGO (BOT E COMANDOS) ---
 class BotaoRecrutamento(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -64,8 +94,8 @@ class BotaoRecrutamento(discord.ui.View):
 class MeuBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
+        intents.members = True # OBRIGATÓRIO PARA DAR CARGOS
         intents.message_content = True
-        intents.members = True
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
@@ -81,8 +111,6 @@ async def postar(ctx):
         description="📌 **Requisitos:**\n• +16 anos\n• Responsabilidade\n• Regras da cidade\n\nClique no botão abaixo para iniciar seu formulário.",
         color=0xFF007F
     )
-    embed.set_image(url="https://media.discordapp.net/attachments/1456593884560752670/1465117968441544848/Logo_raze_roleplay_I_2048x2048_I_Jpeg.png?ex=69efe970&is=69ee97f0&hm=e31f4b16ac7e37a833bdea0da093f43f361e7a07b8f943b589089e3108d67d76&animated=true&width=1549&height=1549")
     await ctx.send(embed=embed, view=BotaoRecrutamento())
 
-keep_alive() # Inicia o servidor web para a Render
 bot.run(TOKEN)
