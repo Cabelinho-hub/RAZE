@@ -1,4 +1,4 @@
-import discord  # ESTA LINHA DEVE ESTAR AQUI
+import discord
 import os
 from discord.ext import commands
 from discord import app_commands
@@ -28,7 +28,6 @@ class ModalMotivoRecusa(discord.ui.Modal, title='Motivo da Rejeição'):
             await self.candidato.send(embed=embed)
             
             await interaction.response.send_message(f"❌ {self.candidato.display_name} foi recusado e avisado.", ephemeral=True)
-            # Desativa os botões da mensagem original
             await interaction.message.edit(view=None)
         except discord.Forbidden:
             await interaction.response.send_message(f"⚠️ Recusado, mas não consegui enviar DM para {self.candidato.mention}.", ephemeral=True)
@@ -47,8 +46,16 @@ class ViewStaff(discord.ui.View):
 
         if candidato and cargo:
             await candidato.add_roles(cargo)
-            await interaction.response.send_message(f"✅ {candidato.mention} você passou a primeira parte, abra um ticket em nosso servidor pra darmos continuidade!", ephemeral=True)
-            await interaction.message.edit(view=None) # Remove os botões
+            # Resposta para quem apertou o botão
+            await interaction.response.send_message(f"✅ {candidato.mention} foi aceito e recebeu o cargo!", ephemeral=True)
+            
+            # Tentar avisar o candidato no privado que ele passou
+            try:
+                await candidato.send(f"🎉 Parabéns! Você passou na primeira parte do recrutamento em **{guild.name}**. Abra um ticket no servidor para darmos continuidade!")
+            except:
+                pass # Se a DM estiver fechada, ele já ganhou o cargo de qualquer jeito
+
+            await interaction.message.edit(view=None)
         else:
             await interaction.response.send_message("Erro: Membro ou Cargo não encontrado.", ephemeral=True)
 
@@ -60,7 +67,7 @@ class ViewStaff(discord.ui.View):
         else:
             await interaction.response.send_message("Candidato não está mais no servidor.", ephemeral=True)
 
-# 3. MODAL DO FORMULÁRIO (O QUE O CANDIDATO PREENCHE)
+# 3. MODAL DO FORMULÁRIO
 class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutamento Staff'):
     p1 = discord.ui.TextInput(label="Qual seu nome e idade?", placeholder="Ex: João, 18 anos")
     p2 = discord.ui.TextInput(label="Por que quer ser Staff?", style=discord.TextStyle.paragraph)
@@ -70,6 +77,8 @@ class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutament
 
     async def on_submit(self, interaction: discord.Interaction):
         canal_log = interaction.guild.get_channel(ID_CANAL_LOG)
+        if not canal_log:
+            return await interaction.response.send_message("Erro: Canal de log não encontrado.", ephemeral=True)
         
         embed = discord.Embed(title="📝 Novo Formulário Recebido", color=discord.Color.magenta())
         embed.add_field(name="Candidato:", value=interaction.user.mention, inline=False)
@@ -79,11 +88,9 @@ class FormularioRecrutamento(discord.ui.Modal, title='Formulário de Recrutament
         embed.add_field(name="4. Disponibilidade", value=self.p4.value, inline=False)
         embed.add_field(name="5. Regras", value=self.p5.value, inline=False)
 
-        # Enviando para a staff com a ViewStaff que criamos acima
         await canal_log.send(embed=embed, view=ViewStaff(interaction.user.id))
         await interaction.response.send_message("✅ Seu formulário foi enviado com sucesso!", ephemeral=True)
 
-# --- RESTANTE DO SEU CÓDIGO (BOT E COMANDOS) ---
 class BotaoRecrutamento(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -95,7 +102,7 @@ class BotaoRecrutamento(discord.ui.View):
 class MeuBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
-        intents.members = True # OBRIGATÓRIO PARA DAR CARGOS
+        intents.members = True
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
 
@@ -112,6 +119,8 @@ async def postar(ctx):
         description="📌 **Requisitos:**\n• +16 anos\n• Responsabilidade\n• Regras da cidade\n\nClique no botão abaixo para iniciar seu formulário.",
         color=0xFF007F
     )
+    # Se quiser adicionar a imagem de novo, basta descomentar a linha abaixo:
+    # embed.set_image(url="LINK_DA_IMAGEM")
     await ctx.send(embed=embed, view=BotaoRecrutamento())
 
 bot.run(TOKEN)
