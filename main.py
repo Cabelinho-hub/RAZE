@@ -110,15 +110,16 @@ bot = MeuBot()
 @commands.has_permissions(administrator=True)
 async def postar(ctx):
     embed = discord.Embed(title="RAZE ROLEPLAY | RECRUTAMENTO", description="Clique no botão abaixo para iniciar.", color=0xFF007F)
-    await ctx.send(embed=embed, view=BotaoInicio())
     embed.set_image(url="https://media.discordapp.net/attachments/1456593884560752670/1465117968990994573/Logo-raze-roleplay-I-512x512-I-Jpeg.png?ex=69f13af0&is=69efe970&hm=c76d34a9af14cdfec1da80668ab648e00356de6f6464fdede22831d9eb0ab0b1&animated=true")
-
+    await ctx.send(embed=embed, view=BotaoInicio())
 # --- INICIALIZAÇÃO ---
 if __name__ == "__main__":
-    # Rodar o bot em uma thread separada do Flask
+    # Inicia o bot em uma thread
     t = Thread(target=lambda: bot.run(TOKEN))
+    t.daemon = True # Isso impede o erro de "shutdown" que apareceu no log
     t.start()
     
-    # Rodar o Flask na porta dinâmica do Render
-    port = int(os.environ.get("PORT", 8080))
+    # Inicia o Flask na porta correta
+    port = int(os.environ.get("PORT", 10000)) # Render costuma usar 10000
     app.run(host='0.0.0.0', port=port)
+
