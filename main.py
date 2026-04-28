@@ -99,10 +99,10 @@ class MeuBot(commands.Bot):
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
 
-    async def setup_hook(self):
-        # Registra a view para ela funcionar após reinícios
+      async def setup_hook(self):
+        # Registra apenas o botão de INICIAR
         self.add_view(BotaoInicio())
-        self.add_view(ViewStaff(0)) # Registra a base para os botões de aceitar/recusar
+
 
 bot = MeuBot()
 
