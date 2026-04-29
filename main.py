@@ -36,7 +36,7 @@ ID_CANAL_LINKS = 1449500465598435370 # Troque pelo ID do canal de links
 ID_CARGO_TEMPORARIO = 1411158272534380694 # Troque pelo ID do cargo
 ID_CANAL_LOGS_LINKS = 1434724433095954443 # Troque pelo ID do canal de logs de link
 
-URL_DO_CANAL_DE_TICKET = "https://discord.com"
+URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/1411159343390396477"
 
 # --- BANCO DE DADOS ---
 def init_db():
@@ -81,7 +81,7 @@ class ViewStaffRecrutamento(ui.View):
         membro = interaction.guild.get_member(self.membro_id)
         if membro:
             try:
-                emb = discord.Embed(title="🥳 Aprovado!", description=f"Abra um ticket aqui: {URL_DO_CANAL_DE_TICKET}", color=discord.Color.green())
+                emb = discord.Embed(title="🥳 Parabéns, Você foi aprovado na primeira fase!!", description=f" Agora, clique no link abaixo para abrir um Ticket e realizar sua entrevista: {URL_DO_CANAL_DE_TICKET}", color=discord.Color.green())
                 await membro.send(embed=emb)
                 await interaction.response.send_message("Aprovado!", ephemeral=True)
                 await interaction.message.edit(view=None)
