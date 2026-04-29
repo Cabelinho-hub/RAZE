@@ -7,7 +7,7 @@ from flask import Flask
 from threading import Thread
 from datetime import datetime
 
-# --- CONFIGURAÇÃO WEB (Flask para o Render) ---
+# --- CONFIGURAÇÃO WEB ---
 app = Flask(__name__)
 @app.route('/')
 def home(): return "Bot Online!"
@@ -16,20 +16,19 @@ def run_server():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- CONFIGURAÇÕES DOS CANAIS E CARGOS (PREENCHA AQUI) ---
+# --- CONFIGURAÇÕES ---
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 ID_CANAL_RECRUTAMENTO_LOGS = 1456450750241570887 
 ID_CARGO_STAFF = 1411158389911715910 
+ID_CANAL_ANON_PUBLICO = 1499100513902264351
+ID_CANAL_ANON_LOGS = 1417278738390978681
+ID_CANAL_LOGS_RP = 1465403347694522490
+ID_CANAL_AVISO_VIGIA = 1499101802631528559
+ID_CARGO_STAFF_AVISO = 1499102061705433249
 
-ID_CANAL_ANON_PUBLICO = 0000  # Canal onde as confissões aparecem
-ID_CANAL_ANON_LOGS = 0000     # Onde staff vê quem mandou o anônimo
-ID_CANAL_LOGS_RP = 0000       # Canal onde o bot da cidade avisa quem entrou
-ID_CANAL_AVISO_VIGIA = 0000   # Onde seu bot avisa que o alvo entrou
-ID_CARGO_STAFF_AVISO = 0000   # Cargo marcado no aviso de vigia
-
-# --- CONEXÃO BANCO DE DADOS (Vigia Permanente) ---
+# --- BANCO DE DADOS ---
 def init_db():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -52,11 +51,11 @@ def db_get_all():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
     cur.execute("SELECT discord_id FROM vigia")
-    ids = {row[0] for row in cur.fetchall()}
+    rows = cur.fetchall()
     conn.close()
-    return ids
+    return [row[0] for row in rows]
 
-# --- MODAIS (ANÔNIMO E VIGIA) ---
+# --- MODAIS E VIEWS ---
 class AnonModal(ui.Modal, title='Mensagem Anônima'):
     msg = ui.TextInput(label='Sua Mensagem', style=discord.TextStyle.paragraph)
     async def on_submit(self, interaction):
@@ -64,26 +63,16 @@ class AnonModal(ui.Modal, title='Mensagem Anônima'):
         logs = interaction.client.get_channel(ID_CANAL_ANON_LOGS)
         await pub.send(embed=discord.Embed(description=self.msg.value, color=0x2b2d31))
         await logs.send(f"👤 **{interaction.user}** ({interaction.user.id}) enviou: {self.msg.value}")
-        await interaction.response.send_message("Enviado anonimamente!", ephemeral=True)
+        await interaction.response.send_message("Enviado!", ephemeral=True)
 
 class VigiaModal(ui.Modal):
     def __init__(self, acao):
         self.acao = acao
         super().__init__(title="Gerenciar Vigia")
-    d_id = ui.TextInput(label='ID do Discord do Alvo')
+    d_id = ui.TextInput(label='ID do Discord')
     async def on_submit(self, interaction):
         db_manage(self.d_id.value, self.acao)
-        await interaction.response.send_message(f"ID {self.d_id.value} {'adicionado' if self.acao == 'add' else 'removido'}!", ephemeral=True)
-
-# --- RECRUTAMENTO (SEU CÓDIGO ORIGINAL) ---
-class ModalRecusa(ui.Modal, title='Motivo da Reprovação'):
-    motivo = ui.TextInput(label="Por que ele foi recusado?", style=discord.TextStyle.paragraph)
-    def __init__(self, membro_candidato):
-        super().__init__()
-        self.membro_candidato = membro_candidato
-    async def on_submit(self, interaction):
-        await self.membro_candidato.send(f"❌ Reprovado no Raze RP.\nMotivo: {self.motivo.value}")
-        await interaction.response.send_message("Candidato recusado.", ephemeral=True)
+        await interaction.response.send_message(f"ID {'adicionado' if self.acao == 'add' else 'removido'}!", ephemeral=True)
 
 class ViewStaffRecrutamento(ui.View):
     def __init__(self, membro_id):
@@ -94,6 +83,7 @@ class ViewStaffRecrutamento(ui.View):
         membro = interaction.guild.get_member(self.membro_id)
         await membro.add_roles(interaction.guild.get_role(ID_CARGO_STAFF))
         await interaction.response.send_message("Aceito!", ephemeral=True)
+        await interaction.message.edit(view=None)
 
 class FormularioRecrutamento(ui.Modal, title='Recrutamento Staff'):
     p1 = ui.TextInput(label="Nome e Idade")
@@ -104,20 +94,15 @@ class FormularioRecrutamento(ui.Modal, title='Recrutamento Staff'):
         await canal.send(embed=embed, view=ViewStaffRecrutamento(interaction.user.id))
         await interaction.response.send_message("Ficha enviada!", ephemeral=True)
 
-# --- PAINEL PRINCIPAL ---
 class MainView(ui.View):
     def __init__(self): super().__init__(timeout=None)
-    
     @ui.button(label="📝 Recrutamento", custom_id="btn_rec", style=discord.ButtonStyle.danger)
     async def rec(self, i, b): await i.response.send_modal(FormularioRecrutamento())
-    
     @ui.button(label="👤 Anônimo", custom_id="btn_anon", style=discord.ButtonStyle.secondary)
     async def anon(self, i, b): await i.response.send_modal(AnonModal())
-    
     @ui.button(label="🕵️ Vigiar ID", custom_id="btn_v_add", style=discord.ButtonStyle.success)
     async def v_add(self, i, b): await i.response.send_modal(VigiaModal('add'))
-
-    @ui.button(label="❌ Parar Vigia", custom_id="btn_v_rem", style=discord.ButtonStyle.secondary)
+    @ui.button(label="❌ Parar Vigia", custom_id="btn_v_rem", style=discord.ButtonStyle.gray)
     async def v_rem(self, i, b): await i.response.send_modal(VigiaModal('remove'))
 
 # --- BOT SETUP ---
@@ -132,12 +117,21 @@ class MeuBot(commands.Bot):
 
     async def on_message(self, message):
         if message.author == self.user: return
+        
+        # ESSA LINHA ABAIXO É O QUE FALTAVA PARA O !SETUP FUNCIONAR
+        await self.process_commands(message)
+
         if message.channel.id == ID_CANAL_LOGS_RP:
             conteudo = message.content.lower()
-            for e in message.embeds: conteudo += f" {e.description} {e.title}"
-            for d_id in db_get_all():
-                if d_id in conteudo:
-                    await self.get_channel(ID_CANAL_AVISO_VIGIA).send(f"🚨 **ALVO LOGADO:** `{d_id}` <@&{ID_CARGO_STAFF_AVISO}>")
+            if message.embeds:
+                for e in message.embeds:
+                    conteudo += f" {str(e.description).lower()} {str(e.title).lower()}"
+            
+            alvos = db_get_all()
+            for d_id in alvos:
+                if str(d_id) in conteudo:
+                    canal = self.get_channel(ID_CANAL_AVISO_VIGIA)
+                    await canal.send(f"🚨 **ALVO LOGADO:** `{d_id}` <@&{ID_CARGO_STAFF_AVISO}>")
 
 bot = MeuBot()
 
@@ -147,7 +141,6 @@ async def setup(ctx):
     embed = discord.Embed(title="RAZE ROLEPLAY | CENTRAL", description="Escolha uma opção abaixo.", color=0xFF007F)
     await ctx.send(embed=embed, view=MainView())
 
-# --- INICIALIZAÇÃO ---
 if __name__ == "__main__":
     Thread(target=run_server).start()
     bot.run(TOKEN)
