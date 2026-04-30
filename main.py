@@ -7,7 +7,6 @@ from flask import Flask
 from threading import Thread
 import asyncio  # Necessário para o timer de remover cargo
 import re       # Necessário para detectar links
-from datetime import datetime
 
 # --- CONFIGURAÇÃO WEB ---
 app = Flask(__name__)
