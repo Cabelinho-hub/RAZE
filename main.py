@@ -35,8 +35,6 @@ ID_CARGO_STAFF_AVISO = 1499102061705433249
 ID_CANAL_LINKS = 1449500465598435370 # Troque pelo ID do canal de links
 ID_CARGO_TEMPORARIO = 1411158272534380694 # Troque pelo ID do cargo
 ID_CANAL_LOGS_LINKS = 1434724433095954443 # Troque pelo ID do canal de logs de link
-ID_CANAL_POSTAGEM = 1472005008063991969  # <--- COLOQUE O ID DO CANAL DE PUNIÇÕES (PÚBLICO)
-ID_CANAL_LOGS = 1435826826827268178      # <--- USEI O ID DA LINHA 30 QUE PARECE SER O DE LOGS RP
 
 URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/1411159343390396477"
 
@@ -138,67 +136,6 @@ class ViewVigiaFixo(ui.View):
         ids = db_get_all()
         lista = "\n".join([f"<@{idd}> (`{idd}`)" for idd in ids]) if ids else "Nenhum ID monitorado."
         await i.response.send_message(f"**IDs sob vigilância:**\n{lista}", ephemeral=True)
-# --- DEFINIÇÃO DO SISTEMA DE PUNIÇÃO ---
-
-class PunicaoModal(discord.ui.Modal, title='Sistema de Punições - Raze RP'):
-    # Campos do formulário que o Staff vai preencher
-    user_id = discord.ui.TextInput(label="ID do Discord da Pessoa", placeholder="Cole o ID aqui...", required=True)
-    motivo = discord.ui.TextInput(label="Motivo da Denúncia", placeholder="Ex: CL / VDM / RDM", required=True)
-    adv = discord.ui.TextInput(label="Tipo de Advertência", placeholder="Ex: Permanente / Adv 1", required=True)
-    tempo_ban = discord.ui.TextInput(label="Tempo de Banimento", placeholder="Ex: 24 horas / 7 dias", required=True)
-    amarrado = discord.ui.TextInput(label="Amarrado", placeholder="0 ou 1", default="0", required=True)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        import datetime
-        
-        user_id_val = self.user_id.value
-        user_mention = f"<@{user_id_val}>"
-        # Gera a data e hora atual automaticamente
-        data_hora = datetime.now().strftime('%d/%m/%Y %H:%M')
-        # --- LOG PARA A STAFF (Aparência Premium) ---
-        embed_log = discord.Embed(
-            title="❕ LOG - Punição Registrada ❕",
-            description="| Sistema de Punições - Raze RP",
-            color=0x2b2d31
-        )
-        # Coloque aqui o link da logo do seu servidor (opcional)
-        embed_log.set_thumbnail(url="https://media.discordapp.net/attachments/1456593884560752670/1465117968990994573/Logo-raze-roleplay-I-512x512-I-Jpeg.png?ex=69f3ddf0&is=69f28c70&hm=df6651852023f8d1d61c02d4a7abb58f8097a3953694a3aa354b3d44f98736c2&=&format=webp&quality=lossless&width=343&height=343")
-
-        embed_log.add_field(name="👤 Usuário Punido", value=f"{user_mention} ({user_id_val})", inline=False)
-        embed_log.add_field(name="📋 Responsável", value=f"{interaction.user.mention}", inline=False)
-        embed_log.add_field(name="🔔 Motivo", value=f"{self.motivo.value}", inline=False)
-        embed_log.add_field(name="⏱️ Tempo da Advertência", value=f"{self.adv.value}", inline=False)
-        embed_log.add_field(name="🗓️ Data e Hora", value=f"{data_hora}", inline=False)
-        embed_log.add_field(name="📝 Total de Advertências", value=f"1", inline=False)
-        
-        embed_log.set_footer(text="Todos os direitos reservados a Raze RP")
-
-        # --- CARD PÚBLICO (O que todos veem no canal de punições) ---
-        embed_pub = discord.Embed(title="Raze RP - PUNIÇÕES", color=0x2b2d31)
-        embed_pub.description = f"O usuário {user_mention} foi advertido por uma conduta inadequada."
-        embed_pub.add_field(name="⚠️ Motivo", value=self.motivo.value, inline=False)
-        embed_pub.add_field(name="Tempo", value=self.tempo_ban.value, inline=True)
-        embed_pub.add_field(name="Amarrado", value=self.amarrado.value, inline=True)
-        embed_pub.set_footer(text="Reforçamos a importância de respeitar as regras do servidor.")
-
-        # Puxando os canais que você configurou no topo do arquivo
-        canal_pub = interaction.client.get_channel(ID_CANAL_POSTAGEM)
-        canal_log = interaction.client.get_channel(ID_CANAL_LOGS)
-
-        # Envia as mensagens
-        if canal_pub: await canal_pub.send(embed=embed_pub)
-        if canal_log: await canal_log.send(embed=embed_log)
-
-        await interaction.response.send_message("✅ Punição registrada com sucesso!", ephemeral=True)
-
-class PainelAdmin(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None) # Botão imortal
-
-    @discord.ui.button(label="Registrar Punição", style=discord.ButtonStyle.danger, custom_id="btn_punir_fixo")
-    async def registrar_punicao(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Quando clica no botão, abre o formulário acima
-        await interaction.response.send_modal(PunicaoModal())
 
 # --- BOT CORE ---
 class MeuBot(commands.Bot):
@@ -209,7 +146,6 @@ class MeuBot(commands.Bot):
         self.add_view(ViewRecrutamentoFixo())
         self.add_view(ViewAnonFixo())
         self.add_view(ViewVigiaFixo())
-        self.add_view(PainelAdmin())
         init_db()
 
     async def on_message(self, message):
@@ -277,17 +213,7 @@ async def setup_anonimo(ctx): await ctx.send(embed=discord.Embed(title="ANÔNIMO
 @commands.has_permissions(administrator=True)
 async def setup_vigia(ctx): await ctx.send(embed=discord.Embed(title="VIGILÂNCIA"), view=ViewVigiaFixo())
 
-@bot.command(name="setup_punicao")
-@commands.has_permissions(administrator=True)
-async def setup_punicao(ctx):
-    embed = discord.Embed(
-        title="🛡️ Central Administrativa - Punições",
-        description="Clique no botão abaixo para registrar uma punição.",
-        color=discord.Color.dark_grey()
-    )
-    await ctx.send(embed=embed, view=PainelAdmin())
-    await ctx.message.delete()
-    
+
 if __name__ == "__main__":
     Thread(target=run_server).start()
     bot.run(TOKEN)
