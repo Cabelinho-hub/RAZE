@@ -5,6 +5,7 @@ import os
 import psycopg2
 from flask import Flask
 from threading import Thread
+from datetime import datetime
 
 # --- CONFIGURAÇÃO WEB ---
 app = Flask(__name__)
@@ -96,9 +97,22 @@ class ViewRecrutamentoFixo(ui.View):
 # --- 2. ANÔNIMO ---
 class AnonModal(ui.Modal, title='Confissão'):
     msg = ui.TextInput(label='Mensagem', style=discord.TextStyle.paragraph)
+
     async def on_submit(self, interaction):
-        await interaction.client.get_channel(ID_CANAL_ANON_PUBLICO).send(embed=discord.Embed(description=self.msg.value, color=0x2b2d31))
-        await interaction.client.get_channel(ID_CANAL_ANON_LOGS).send(f"👤 **{interaction.user}** enviou: {self.msg.value}")
+        # 1. Envio para o canal público (mantém o que já funciona)
+        await interaction.client.get_channel(ID_CANAL_ANON_PUBLICO).send(
+            embed=discord.Embed(description=self.msg.value, color=0x2b2d31)
+        )
+        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        log_msg = f"""
+📅 **Data/Hora:** `{data_hora}`
+👤 **Usuário:** {interaction.user.mention} (`{interaction.user}`)
+💬 **Mensagem:** {self.msg.value}
+"""
+
+        # 3. Envio para o canal de logs e resposta ao usuário
+        await interaction.client.get_channel(ID_CANAL_ANON_LOGS).send(log_msg)
         await interaction.response.send_message("Enviado!", ephemeral=True)
 
 class ViewAnonFixo(ui.View):
