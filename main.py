@@ -5,8 +5,6 @@ import os
 import psycopg2
 from flask import Flask
 from threading import Thread
-import asyncio  # Necessário para o timer de remover cargo
-import re       # Necessário para detectar links
 
 # --- CONFIGURAÇÃO WEB ---
 app = Flask(__name__)
@@ -17,11 +15,10 @@ def run_server():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- CONFIGURAÇÕES (AJUSTE OS IDs AQUI) ---
+# --- CONFIGURAÇÕES (VERIFIQUE SE OS IDs ESTÃO CERTOS) ---
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# IDs Existentes
 ID_CANAL_RECRUTAMENTO_LOGS = 1456450750241570887 
 ID_CARGO_STAFF = 1411158389911715910 
 ID_CANAL_ANON_PUBLICO = 1499100513902264351
@@ -30,12 +27,7 @@ ID_CANAL_LOGS_RP = 1465403347694522490
 ID_CANAL_AVISO_VIGIA = 1499101802631528559
 ID_CARGO_STAFF_AVISO = 1499102061705433249
 
-# IDs DO SISTEMA DE LINKS (RECOLOCADOS)
-ID_CANAL_LINKS = 1449500465598435370 # Troque pelo ID do canal de links
-ID_CARGO_TEMPORARIO = 1411158272534380694 # Troque pelo ID do cargo
-ID_CANAL_LOGS_LINKS = 1434724433095954443 # Troque pelo ID do canal de logs de link
-
-URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/1411159343390396477"
+URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/141115934339039647"
 
 # --- BANCO DE DADOS ---
 def init_db():
@@ -57,11 +49,7 @@ def db_get_all():
     rows = cur.fetchall(); conn.close()
     return [row[0] for row in rows]
 
-# --- CLASSES DE INTERFACE (RECRUTAMENTO, ANON, VIGIA) ---
-# [As classes ModalRecusa, ViewStaffRecrutamento, FormularioRecrutamento, 
-#  ViewRecrutamentoFixo, AnonModal, ViewAnonFixo, VigiaModal, ViewVigiaFixo 
-#  permanecem as mesmas do seu código anterior]
-
+# --- 1. RECRUTAMENTO ---
 class ModalRecusa(ui.Modal, title='Motivo da Reprovação'):
     motivo = ui.TextInput(label="Motivo", style=discord.TextStyle.paragraph)
     def __init__(self, membro): super().__init__(); self.membro = membro
@@ -80,7 +68,7 @@ class ViewStaffRecrutamento(ui.View):
         membro = interaction.guild.get_member(self.membro_id)
         if membro:
             try:
-                emb = discord.Embed(title="🥳 Parabéns, Você foi aprovado na primeira fase!!", description=f" Agora, clique no link abaixo para abrir um Ticket e realizar sua entrevista: {URL_DO_CANAL_DE_TICKET}", color=discord.Color.green())
+                emb = discord.Embed(title="🥳 Aprovado!", description=f"Abra um ticket aqui: {URL_DO_CANAL_DE_TICKET}", color=discord.Color.green())
                 await membro.send(embed=emb)
                 await interaction.response.send_message("Aprovado!", ephemeral=True)
                 await interaction.message.edit(view=None)
@@ -105,6 +93,7 @@ class ViewRecrutamentoFixo(ui.View):
     @ui.button(label="📝 Iniciar Recrutamento", custom_id="rec_fixo", style=discord.ButtonStyle.danger)
     async def start(self, i, b): await i.response.send_modal(FormularioRecrutamento())
 
+# --- 2. ANÔNIMO ---
 class AnonModal(ui.Modal, title='Confissão'):
     msg = ui.TextInput(label='Mensagem', style=discord.TextStyle.paragraph)
     async def on_submit(self, interaction):
@@ -117,6 +106,7 @@ class ViewAnonFixo(ui.View):
     @ui.button(label="👤 Enviar Anônimo", custom_id="anon_fixo", style=discord.ButtonStyle.secondary)
     async def start(self, i, b): await i.response.send_modal(AnonModal())
 
+# --- 3. VIGIA (COM MENÇÃO E LISTA) ---
 class VigiaModal(ui.Modal):
     def __init__(self, acao): self.acao = acao; super().__init__(title="Gerenciar Vigia")
     d_id = ui.TextInput(label='ID do Discord')
@@ -128,8 +118,10 @@ class ViewVigiaFixo(ui.View):
     def __init__(self): super().__init__(timeout=None)
     @ui.button(label="🕵️ Vigiar ID", custom_id="v_add_fixo", style=discord.ButtonStyle.success)
     async def add(self, i, b): await i.response.send_modal(VigiaModal('add'))
+    
     @ui.button(label="❌ Parar Vigia", custom_id="v_rem_fixo", style=discord.ButtonStyle.danger)
     async def rem(self, i, b): await i.response.send_modal(VigiaModal('remove'))
+
     @ui.button(label="📋 Ver Lista", custom_id="v_list_fixo", style=discord.ButtonStyle.secondary)
     async def list(self, i, b):
         ids = db_get_all()
@@ -150,8 +142,6 @@ class MeuBot(commands.Bot):
     async def on_message(self, message):
         if message.author == self.user: return
         await self.process_commands(message)
-
-        # 1. LÓGICA DE VIGIA (LOGS RP)
         if message.channel.id == ID_CANAL_LOGS_RP:
             conteudo = message.content.lower()
             for e in message.embeds: conteudo += f" {str(e.description).lower()} {str(e.title).lower()} "
@@ -159,45 +149,6 @@ class MeuBot(commands.Bot):
                 if str(d_id) in conteudo:
                     await self.get_channel(ID_CANAL_AVISO_VIGIA).send(f"🚨 **ALVO LOGADO:** <@{d_id}> (`{d_id}`) entrou na cidade! <@&{ID_CARGO_STAFF_AVISO}>")
 
-        # 2. LÓGICA DE LINKS (MELHORADA)
-        if message.channel.id == ID_CANAL_LINKS:
-            # Regex mais abrangente para links
-            regex_link = r'(https?://\S+|www\.\S+)'
-            
-            if re.search(regex_link, message.content):
-                cargo = message.guild.get_role(ID_CARGO_TEMPORARIO)
-                if cargo and cargo not in message.author.roles:
-                    try:
-                        await message.author.add_roles(cargo)
-                        
-                        # Log de Atribuição
-                        canal_logs = self.get_channel(ID_CANAL_LOGS_LINKS)
-                        if canal_logs:
-                            embed = discord.Embed(
-                                title="🔗 Cargo Temporário Atribuído", 
-                                description=f"**Usuário:** {message.author.mention}\n**Motivo:** Postou link em <#{ID_CANAL_LINKS}>", 
-                                color=discord.Color.blue(),
-                                timestamp=datetime.utcnow()
-                            )
-                            await canal_logs.send(embed=embed)
-
-                        # Função assíncrona separada para não bloquear o on_message
-                        async def remover_cargo_depois():
-                            await asyncio.sleep(3600) # 1 hora
-                            # Busca o membro atualizado para evitar erro de cache
-                            membro = message.guild.get_member(message.author.id)
-                            if membro and cargo in membro.roles:
-                                await membro.remove_roles(cargo)
-                                if canal_logs:
-                                    await canal_logs.send(f"⏰ Cargo temporário removido de {membro.mention}.")
-                        
-                        # Inicia a contagem sem travar o resto do bot
-                        self.loop.create_task(remover_cargo_depois())
-
-                    except discord.Forbidden:
-                        print(f"Erro: Sem permissão para gerenciar cargos para {message.author}")
-                    except Exception as e:
-                        print(f"Erro na lógica de links: {e}")
 bot = MeuBot()
 
 @bot.command()
@@ -211,7 +162,6 @@ async def setup_anonimo(ctx): await ctx.send(embed=discord.Embed(title="ANÔNIMO
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def setup_vigia(ctx): await ctx.send(embed=discord.Embed(title="VIGILÂNCIA"), view=ViewVigiaFixo())
-
 
 if __name__ == "__main__":
     Thread(target=run_server).start()
