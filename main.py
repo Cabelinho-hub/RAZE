@@ -154,8 +154,7 @@ class PunicaoModal(discord.ui.Modal, title='Sistema de Punições - Raze RP'):
         user_id_val = self.user_id.value
         user_mention = f"<@{user_id_val}>"
         # Gera a data e hora atual automaticamente
-        data_hora = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
-
+        data_hora = datetime.now().strftime('%d/%m/%Y %H:%M')
         # --- LOG PARA A STAFF (Aparência Premium) ---
         embed_log = discord.Embed(
             title="❕ LOG - Punição Registrada ❕",
