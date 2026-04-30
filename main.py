@@ -148,7 +148,7 @@ class PunicaoModal(discord.ui.Modal, title='Sistema de Punições - Raze RP'):
     tempo_ban = discord.ui.TextInput(label="Tempo de Banimento", placeholder="Ex: 24 horas / 7 dias", required=True)
     amarrado = discord.ui.TextInput(label="Amarrado", placeholder="0 ou 1", default="0", required=True)
 
-        async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction):
         import datetime
         
         user_id_val = self.user_id.value
