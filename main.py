@@ -99,46 +99,6 @@ class ViewRecrutamentoFixo(ui.View):
     @ui.button(label="📝 Iniciar Recrutamento", custom_id="rec_fixo", style=discord.ButtonStyle.danger)
     async def start(self, i, b): await i.response.send_modal(FormularioRecrutamento())
 
-    async def on_message(self, message):
-        if message.author == self.user: return
-        await self.process_commands(message)
-
-        # Lógica de Links e Cargo Provisório
-        if message.channel.id == ID_CANAL_LINK:
-            if "http" in message.content.lower():
-                membro = message.author
-                cargo = message.guild.get_role(ID_CARGO_PROVISORIO)
-                canal_logs = self.get_channel(ID_CANAL_LOGS_LINKS)
-
-                if cargo:
-                    # 1. Adiciona o cargo e avisa a Staff
-                    await membro.add_roles(cargo)
-                    
-                    emb_log = discord.Embed(
-                        title="🔗 Link Postado & Cargo Entregue",
-                        description=f"**Usuário:** {membro.mention}\n**Conteúdo:** {message.content}\n**Ação:** Cargo `{cargo.name}` adicionado. O link e o cargo serão removidos em 1 hora.",
-                        color=discord.Color.green(),
-                        timestamp=datetime.now()
-                    )
-                    if canal_logs: await canal_logs.send(embed=emb_log)
-
-                    # 2. Espera 1 hora (3600 segundos)
-                    await asyncio.sleep(3600)
-
-                    # 3. Remove o cargo, deleta a mensagem e avisa a Staff
-                    try:
-                        await membro.remove_roles(cargo)
-                        await message.delete()
-                        
-                        emb_removido = discord.Embed(
-                            title="⏰ Tempo Expirado",
-                            description=f"**Usuário:** {membro.mention}\n**Ação:** Cargo `{cargo.name}` removido e link deletado automaticamente.",
-                            color=discord.Color.orange()
-                        )
-                        if canal_logs: await canal_logs.send(embed=emb_removido)
-                    except Exception as e:
-                        print(f"Erro ao limpar link/cargo: {e}")
-                        
 # --- 2. ANÔNIMO ---
 class AnonModal(ui.Modal, title='Confissão'):
     msg = ui.TextInput(label='Mensagem', style=discord.TextStyle.paragraph)
@@ -207,6 +167,31 @@ class MeuBot(commands.Bot):
             for d_id in db_get_all():
                 if str(d_id) in conteudo:
                     await self.get_channel(ID_CANAL_AVISO_VIGIA).send(f"🚨 **ALVO LOGADO:** <@{d_id}> (`{d_id}`) entrou na cidade! <@&{ID_CARGO_STAFF_AVISO}>")
+
+        # 1. Verifica se é o canal do link
+         if message.channel.id == ID_CANAL_LINK:
+            if "http" in message.content.lower():
+                membro = message.author
+                cargo = message.guild.get_role(ID_CARGO_PROVISORIO)
+                canal_logs = self.get_channel(ID_CANAL_LOGS_LINKS)
+
+                if cargo:
+                    # Dá o cargo e avisa a staff
+                    await membro.add_roles(cargo)
+                    emb_log = discord.Embed(title="🔗 Link Postado", description=f"{membro.mention} postou um link.", color=discord.Color.green())
+                    if canal_logs: await canal_logs.send(embed=emb_log)
+
+                    # Espera 1 hora
+                    await asyncio.sleep(3600)
+
+                    # Remove tudo e avisa a staff
+                    try:
+                        await membro.remove_roles(cargo)
+                        await message.delete()
+                        emb_fim = discord.Embed(title="⏰ Tempo Esgotado", description=f"Cargo de {membro.mention} removido.", color=discord.Color.orange())
+                        if canal_logs: await canal_logs.send(embed=emb_fim)
+                    except:
+                        pass
 
 bot = MeuBot()
 
