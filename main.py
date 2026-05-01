@@ -161,37 +161,43 @@ class MeuBot(commands.Bot):
     async def on_message(self, message):
         if message.author == self.user: return
         await self.process_commands(message)
+        
+        # --- LÓGICA DO VIGIA ---
         if message.channel.id == ID_CANAL_LOGS_RP:
             conteudo = message.content.lower()
-            for e in message.embeds: conteudo += f" {str(e.description).lower()} {str(e.title).lower()} "
+            for e in message.embeds: 
+                conteudo += f" {str(e.description).lower()} {str(e.title).lower()} "
             for d_id in db_get_all():
                 if str(d_id) in conteudo:
-                    await self.get_channel(ID_CANAL_AVISO_VIGIA).send(f"🚨 **ALVO LOGADO:** <@{d_id}> (`{d_id}`) entrou na cidade! <@&{ID_CARGO_STAFF_AVISO}>")
+                    canal_aviso = self.get_channel(ID_CANAL_AVISO_VIGIA)
+                    if canal_aviso:
+                        await canal_aviso.send(f"🚨 **ALVO LOGADO:** <@{d_id}> (`{d_id}`) entrou na cidade! <@&{ID_CARGO_STAFF_AVISO}>")
 
-        # 1. Verifica se é o canal do link
-         if message.channel.id == ID_CANAL_LINK:
+        # --- LÓGICA DO LINK ---
+        if message.channel.id == ID_CANAL_LINK:
             if "http" in message.content.lower():
                 membro = message.author
                 cargo = message.guild.get_role(ID_CARGO_PROVISORIO)
                 canal_logs = self.get_channel(ID_CANAL_LOGS_LINKS)
 
                 if cargo:
-                    # Dá o cargo e avisa a staff
-                    await membro.add_roles(cargo)
-                    emb_log = discord.Embed(title="🔗 Link Postado", description=f"{membro.mention} postou um link.", color=discord.Color.green())
-                    if canal_logs: await canal_logs.send(embed=emb_log)
-
-                    # Espera 1 hora
-                    await asyncio.sleep(3600)
-
-                    # Remove tudo e avisa a staff
                     try:
+                        # Dá o cargo e avisa a staff
+                        await membro.add_roles(cargo)
+                        emb_log = discord.Embed(title="🔗 Link Postado", description=f"{membro.mention} postou um link e recebeu o cargo.", color=discord.Color.green())
+                        if canal_logs: await canal_logs.send(embed=emb_log)
+
+                        # Espera 1 hora
+                        await asyncio.sleep(3600)
+
+                        # Remove o cargo e deleta a mensagem
                         await membro.remove_roles(cargo)
                         await message.delete()
-                        emb_fim = discord.Embed(title="⏰ Tempo Esgotado", description=f"Cargo de {membro.mention} removido.", color=discord.Color.orange())
+                        
+                        emb_fim = discord.Embed(title="⏰ Tempo Esgotado", description=f"Cargo de {membro.mention} removido e link apagado.", color=discord.Color.orange())
                         if canal_logs: await canal_logs.send(embed=emb_fim)
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"Erro no sistema de links: {e}")
 
 bot = MeuBot()
 
