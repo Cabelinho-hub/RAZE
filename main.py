@@ -192,9 +192,8 @@ class MeuBot(commands.Bot):
 
                         # Remove o cargo e deleta a mensagem
                         await membro.remove_roles(cargo)
-                        await message.delete()
                         
-                        emb_fim = discord.Embed(title="⏰ Tempo Esgotado", description=f"Cargo de {membro.mention} removido e link apagado.", color=discord.Color.orange())
+                        emb_fim = discord.Embed(title="⏰ Tempo Esgotado", description=f"Cargo de {membro.mention} removido com sucesso.", color=discord.Color.orange())
                         if canal_logs: await canal_logs.send(embed=emb_fim)
                     except Exception as e:
                         print(f"Erro no sistema de links: {e}")
