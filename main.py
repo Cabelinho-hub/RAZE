@@ -39,21 +39,31 @@ URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/1
 def init_db():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS vigia (discord_id TEXT PRIMARY KEY)")
-    conn.commit(); cur.close(); conn.close()
+    # Adicionada a coluna 'motivo' na tabela
+    cur.execute("CREATE TABLE IF NOT EXISTS vigia (discord_id TEXT PRIMARY KEY, motivo TEXT)")
+    conn.commit()
+    cur.close()
+    conn.close()
 
-def db_manage(d_id, acao='add'):
+def db_manage(d_id, acao, motivo=None):
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    if acao == 'add': cur.execute("INSERT INTO vigia (discord_id) VALUES (%s) ON CONFLICT DO NOTHING", (str(d_id),))
-    else: cur.execute("DELETE FROM vigia WHERE discord_id = %s", (str(d_id),))
-    conn.commit(); conn.close()
+    if acao == 'add':
+        cur.execute("INSERT INTO vigia (discord_id, motivo) VALUES (%s, %s) ON CONFLICT (discord_id) DO UPDATE SET motivo = EXCLUDED.motivo", (d_id, motivo))
+    elif acao == 'remove':
+        cur.execute("DELETE FROM vigia WHERE discord_id = %s", (d_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def db_get_all():
     conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor(); cur.execute("SELECT discord_id FROM vigia")
-    rows = cur.fetchall(); conn.close()
-    return [row[0] for row in rows]
+    cur = conn.cursor()
+    cur.execute("SELECT discord_id, motivo FROM vigia")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows # Retorna lista de tuplas [(id, motivo), ...]
 
 # --- 1. RECRUTAMENTO ---
 class ModalRecusa(ui.Modal, title='Motivo da Reprovação'):
@@ -127,14 +137,21 @@ class ViewAnonFixo(ui.View):
 
 # --- 3. VIGIA (COM MENÇÃO E LISTA) ---
 class VigiaModal(ui.Modal):
-    def __init__(self, acao): self.acao = acao; super().__init__(title="Gerenciar Vigia")
-    d_id = ui.TextInput(label='ID do Discord')
+    def __init__(self, acao):
+        self.acao = acao
+        super().__init__(title="Gerenciar Vigia")
+    
+    d_id = ui.TextInput(label='ID do Discord', placeholder='Digite o ID numérico...')
+    motivo = ui.TextInput(label='Motivo da Vigilância', style=discord.TextStyle.paragraph, required=False, placeholder='Ex: Suspeito de VDM')
+
     async def on_submit(self, interaction):
-        db_manage(self.d_id.value, self.acao)
-        await interaction.response.send_message(f"ID {'adicionado' if self.acao == 'add' else 'removido'}!", ephemeral=True)
+        db_manage(self.d_id.value, self.acao, self.motivo.value)
+        msg = f"ID `{self.d_id.value}` adicionado com sucesso!" if self.acao == 'add' else f"ID `{self.d_id.value}` removido!"
+        await interaction.response.send_message(msg, ephemeral=True)
 
 class ViewVigiaFixo(ui.View):
     def __init__(self): super().__init__(timeout=None)
+    
     @ui.button(label="🕵️ Vigiar ID", custom_id="v_add_fixo", style=discord.ButtonStyle.success)
     async def add(self, i, b): await i.response.send_modal(VigiaModal('add'))
     
@@ -143,8 +160,8 @@ class ViewVigiaFixo(ui.View):
 
     @ui.button(label="📋 Ver Lista", custom_id="v_list_fixo", style=discord.ButtonStyle.secondary)
     async def list(self, i, b):
-        ids = db_get_all()
-        lista = "\n".join([f"<@{idd}> (`{idd}`)" for idd in ids]) if ids else "Nenhum ID monitorado."
+        dados = db_get_all()
+        lista = "\n".join([f"<@{d[0]}> | Motivo: {d[1]} (`{d[0]}`)" for d in dados]) if dados else "Nenhum ID monitorado."
         await i.response.send_message(f"**IDs sob vigilância:**\n{lista}", ephemeral=True)
 
 # --- BOT CORE ---
@@ -161,17 +178,25 @@ class MeuBot(commands.Bot):
     async def on_message(self, message):
         if message.author == self.user: return
         await self.process_commands(message)
-        
-        # --- LÓGICA DO VIGIA ---
+
         if message.channel.id == ID_CANAL_LOGS_RP:
             conteudo = message.content.lower()
-            for e in message.embeds: 
+            for e in message.embeds:
                 conteudo += f" {str(e.description).lower()} {str(e.title).lower()} "
-            for d_id in db_get_all():
+            
+            # Busca todos os monitorados
+            monitorados = db_get_all()
+            for d_id, motivo in monitorados:
                 if str(d_id) in conteudo:
                     canal_aviso = self.get_channel(ID_CANAL_AVISO_VIGIA)
                     if canal_aviso:
-                        await canal_aviso.send(f"🚨 **ALVO LOGADO:** <@{d_id}> (`{d_id}`) entrou na cidade! <@&{ID_CARGO_STAFF_AVISO}>")
+                        agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
+                        embed = discord.Embed(title="🚨 ALVO DETECTADO", color=discord.Color.red())
+                        embed.add_field(name="Alvo", value=f"<@{d_id}> (`{d_id}`)", inline=False)
+                        embed.add_field(name="Motivo", value=motivo or "Não informado", inline=False)
+                        embed.add_field(name="Data/Hora", value=agora, inline=False)
+                        
+                        await canal_aviso.send(content=f"<@&{ID_CARGO_STAFF_AVISO}>", embed=embed)
 
         # --- LÓGICA DO LINK ---
         if message.channel.id == ID_CANAL_LINK:
@@ -210,7 +235,9 @@ async def setup_anonimo(ctx): await ctx.send(embed=discord.Embed(title="ANÔNIMO
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def setup_vigia(ctx): await ctx.send(embed=discord.Embed(title="VIGILÂNCIA"), view=ViewVigiaFixo())
+async def setup_vigia(ctx):
+    embed = discord.Embed(title="SISTEMA DE VIGILÂNCIA", description="Clique nos botões abaixo para gerenciar os alvos.", color=discord.Color.blue())
+    await ctx.send(embed=embed, view=ViewVigiaFixo())
 
 if __name__ == "__main__":
     Thread(target=run_server).start()
