@@ -39,8 +39,19 @@ URL_DO_CANAL_DE_TICKET = "https://ptb.discord.com/channels/1325138278298550272/1
 def init_db():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-    # Adicionada a coluna 'motivo' na tabela
-    cur.execute("CREATE TABLE IF NOT EXISTS vigia (discord_id TEXT PRIMARY KEY, motivo TEXT)")
+    # Garante que a tabela base existe
+    cur.execute("CREATE TABLE IF NOT EXISTS vigia (discord_id TEXT PRIMARY KEY)")
+    
+    # Adiciona a coluna motivo se ela ainda não estiver lá
+    cur.execute("""
+        DO $$ 
+        BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                           WHERE table_name='vigia' AND column_name='motivo') THEN 
+                ALTER TABLE vigia ADD COLUMN motivo TEXT; 
+            END IF; 
+        END $$;
+    """)
     conn.commit()
     cur.close()
     conn.close()
